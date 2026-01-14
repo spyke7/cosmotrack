@@ -7,3 +7,5 @@ Cosmostrack is made using panda3D graphics library and skyfield.
 
 ### Getting started
 `pip install -r requirements.txt`
+
+`py -m cosmotrack.core.engine`
