@@ -8,11 +8,15 @@ def getActiveSatellites():
     
     lines = res.text.strip().splitlines()
     
-    names = []
+    satellites = []
     for i in range(0, len(lines), 3):
-        names.append(lines[i].strip())
+        if (i+2 < len(lines)):
+            name = lines[i].strip()
+            name1 = lines[i+1].strip()
+            name2 = lines[i+2].strip()
+            satellites.append((name, name1, name2))
         
-    return names
+    return satellites
 
 def getSpaceStations():
     res = requests.get(celestrak_url[0]+celestrak_url[2], timeout=20)
@@ -20,8 +24,12 @@ def getSpaceStations():
     
     lines = res.text.strip().splitlines()
     
-    names = []
+    stations = []
     for i in range(0, len(lines), 3):
-        names.append(lines[i].strip())
-        
-    return names
+        if (i+2 < len(lines)):
+            name = lines[i].strip()
+            name1 = lines[i+1].strip()
+            name2 = lines[i+2].strip()
+            stations.append((name, name1, name2))   
+
+    return stations
