@@ -47,7 +47,7 @@ class CosmotrackApp(ShowBase):
         self.satelliteTracker = SatelliteTracker()  
         self.satelliteDots = {}  
         self.activeSatellites = [] 
-    
+        self.detailsPanelCreated = False
         
         self.totalCount = 0
         self.showObjectList = False
@@ -75,7 +75,7 @@ class CosmotrackApp(ShowBase):
         # creating earth
         self.earth = self.naturalObjectCreator.createEarth(self.render, self.loader)
         self.earth.setH(180)
-        # self.taskMgr.add(self.rotateEarthTask, "rotateEarth")
+        self.taskMgr.add(self.rotateEarthTask, "rotateEarth")
         
         # attaching earth to the main scene
         self.sceneRoot = self.render.attachNewNode("sceneRoot")
@@ -136,9 +136,12 @@ class CosmotrackApp(ShowBase):
         self.render.setLight(directionalLightNP)
         
     def rotateEarthTask(self, task):
-        angleDegrees = task.time*(360/86400)
+        totalTime = 86400
+        timeElapsed=task.time
         
-        self.earth.setHpr(angleDegrees, 0, 0)
+        rotationFraction = (timeElapsed / totalTime) % 1.0
+        
+        self.earth.setTexOffset(TextureStage.getDefault(), rotationFraction, 0)
         
         return Task.cont
     
@@ -574,17 +577,154 @@ class CosmotrackApp(ShowBase):
     def selectObjectItem(self, objectName):
         print(f"Selected object: {objectName}")
         for name, dot in self.satelliteDots.items():
-            dot.setColor(1, 0, 0, 1)  # Red
-            dot.setScale(1.0)  # Normal size
+            dot.setColor(1, 0, 0, 1) 
+            dot.setScale(1.0) 
         
-        # Highlight the selected one
         if objectName in self.satelliteDots:
             self.satelliteDots[objectName].setColor(0, 1, 0, 1)  
             self.satelliteDots[objectName].setScale(2.0) 
         
-        # Store selected satellite
         self.selectedSatellite = objectName
-
+        
+        if hasattr(self, 'detailsPanel'):
+            self.detailsPanel.destroy()
+            del self.detailsPanel
+        
+        self.createDetailsPanel(objectName)
+        self.detailsPanelCreated = True
+        
+    def createDetailsPanel(self, objectName):
+        self.detailsPanel = DirectFrame(
+            frameColor=(0.02, 0.02, 0.08, 0.95),
+            frameSize=(-0.35, 0.35, -0.45, 0.45),
+            pos=(1.1, 0, 0.35),
+            # relief=DGG.RAISED,
+            borderWidth=(0.01, 0.01)
+        )
+        self.detailsPanel.setTransparency(TransparencyAttrib.MAlpha)
+        
+        closeBtn = DirectButton(
+            image="../assets/close.png",
+            scale=0.06,
+            pos=(0.43, 0, 0.38),
+            frameSize=(-0.8, 0.8, -0.6, 0.8),
+            frameColor=(0.8, 0.2, 0.2, 0.9),
+            # text_fg=(1, 1, 1, 1),
+            command=self.closeDetailsPanel,
+            parent=self.detailsPanel,
+            relief=DGG.FLAT
+        )
+        
+        
+        titleLabel = DirectLabel(
+            text="Satellite Details",
+            scale=0.04,
+            pos=(0, 0, 0.35),
+            text_fg=(1, 1, 1, 1),
+            text_align=TextNode.ACenter,
+            frameColor=(0, 0, 0, 0),
+            parent=self.detailsPanel
+        )
+        
+        nameLabel = DirectLabel(
+            text=objectName,
+            scale=0.045,
+            pos=(0, 0, 0.25),
+            text_fg=(0.3, 1, 0.3, 1),  
+            text_align=TextNode.ACenter,
+            frameColor=(0, 0, 0, 0),
+            parent=self.detailsPanel
+        )
+        
+        if objectName in self.satelliteTracker.satellites:
+            lat, lon, alt = self.satelliteTracker.getPosition(objectName)
+            
+            latLabel = DirectLabel(
+                text=f"Latitude: {lat:.4f}°",
+                scale=0.035,
+                pos=(0, 0, 0.12),
+                text_fg=(0.9, 0.9, 0.9, 1),
+                text_align=TextNode.ACenter,
+                frameColor=(0, 0, 0, 0),
+                parent=self.detailsPanel
+            )
+            
+            lonLabel = DirectLabel(
+                text=f"Longitude: {lon:.4f}°",
+                scale=0.035,
+                pos=(0, 0, 0.04),
+                text_fg=(0.9, 0.9, 0.9, 1),
+                text_align=TextNode.ACenter,
+                frameColor=(0, 0, 0, 0),
+                parent=self.detailsPanel
+            )
+            
+            altLabel = DirectLabel(
+                text=f"Altitude: {alt:.2f} km",
+                scale=0.035,
+                pos=(0, 0, -0.04),
+                text_fg=(0.9, 0.9, 0.9, 1),
+                text_align=TextNode.ACenter,
+                frameColor=(0, 0, 0, 0),
+                parent=self.detailsPanel
+            )
+            
+            latHemi = "N" if lat >= 0 else "S"
+            lonHemi = "E" if lon >= 0 else "W"
+            
+            hemisphereLabel = DirectLabel(
+                text=f"Position: {abs(lat):.2f}°{latHemi}, {abs(lon):.2f}°{lonHemi}",
+                scale=0.03,
+                pos=(0, 0, -0.15),
+                text_fg=(0.7, 0.7, 0.7, 1),
+                text_align=TextNode.ACenter,
+                frameColor=(0, 0, 0, 0),
+                parent=self.detailsPanel
+            )
+            
+            self.detailsLabels = {
+                'lat': latLabel,
+                'lon': lonLabel,
+                'alt': altLabel,
+                'hemisphere': hemisphereLabel,
+                'name': objectName
+            }
+            
+            if not hasattr(self, 'detailsUpdateTaskStarted'):
+                self.taskMgr.add(self.updateDetailsTask, "updateDetails")
+                self.detailsUpdateTaskStarted = True
+                
+    def updateDetailsTask(self, task):
+        if not hasattr(self, 'detailsPanel') or not hasattr(self, 'detailsLabels'):
+            return Task.cont
+        
+        objectName = self.detailsLabels['name']
+        
+        if objectName in self.satelliteTracker.satellites:
+            lat, lon, alt = self.satelliteTracker.getPosition(objectName)
+            
+            self.detailsLabels['lat']['text'] = f"Latitude: {lat:.4f}°"
+            self.detailsLabels['lon']['text'] = f"Longitude: {lon:.4f}°"
+            self.detailsLabels['alt']['text'] = f"Altitude: {alt:.2f} km"
+            
+            latHemi = "N" if lat >= 0 else "S"
+            lonHemi = "E" if lon >= 0 else "W"
+            self.detailsLabels['hemisphere']['text'] = f"Position: {abs(lat):.2f}°{latHemi}, {abs(lon):.2f}°{lonHemi}"
+        
+        return Task.cont
+    
+    def closeDetailsPanel(self):
+        if hasattr(self, 'detailsPanel'):
+            self.detailsPanel.destroy()
+            del self.detailsPanel
+        
+        if hasattr(self, 'detailsLabels'):
+            del self.detailsLabels
+        
+        for name, dot in self.satelliteDots.items():
+            dot.setColor(1, 0, 0, 1)
+            dot.setScale(1.0)
+        
     def onItemHover(self, itemCard, event):
         itemCard['frameColor'] = (0.25, 0.35, 0.45, 0.9)
 
