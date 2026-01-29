@@ -54,7 +54,7 @@ In the same way, the small circles are created in `artificialobjects.py`
 The main loop is inside the `core\engine.py`.
 
 ### Screenshots
-
+<img width="1489" height="945" alt="details1" src="https://github.com/user-attachments/assets/9c10e9dc-06ae-468f-8d6f-80abd40a4ce0" />
 
 
 ### Contributing and Support
